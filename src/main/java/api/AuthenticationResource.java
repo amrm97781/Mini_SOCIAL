@@ -48,6 +48,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import util.JwtUtil;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -59,26 +60,34 @@ public class AuthenticationResource {
 
     @POST
     @Path("/login")
+    @Produces(MediaType.APPLICATION_JSON)
     public Response login(LoginDTO loginDTO, @Context HttpServletRequest request) {
         try {
-            // 1) authenticate credentials
+            // 1) Authenticate the user
             User user = authenticationService.login(
                     loginDTO.getEmail(),
                     loginDTO.getPassword()
             );
 
-            // 2) store user in session
+            // 2) Generate token
+            String token = JwtUtil.generateToken(user.getEmail());
+
+            // 3) Store user in session
             HttpSession session = request.getSession(true);
             session.setAttribute("currentUser", user);
 
-            // 3) return OK with user info (or a token in a real app)
-            return Response.ok(user).build();
+            // 4) Create JSON response
+            String json = String.format("{\"message\":\"Login successful\", \"token\":\"%s\"}", token);
+
+            return Response.ok(json).build();
+
         } catch (Exception e) {
             return Response.status(Response.Status.UNAUTHORIZED)
-                    .entity(e.getMessage())
+                    .entity("{\"error\":\"" + e.getMessage() + "\"}")
                     .build();
         }
     }
+
 
     @POST
     @Path("/logout")

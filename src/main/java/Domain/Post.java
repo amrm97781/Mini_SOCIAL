@@ -111,8 +111,8 @@ public class Post {
     }
 
     // Linking Posts to group
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "group_id", nullable = false)
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "group_id", nullable = true)
     private Group group;
     public Group getGroup() { return group; }
     public void setGroup(Group group) { this.group = group; }

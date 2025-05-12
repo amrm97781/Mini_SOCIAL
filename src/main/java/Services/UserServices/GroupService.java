@@ -3,6 +3,7 @@ package Services.UserServices;
 import Domain.Group;
 import Domain.User;
 import jakarta.ejb.Stateless;
+import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.ws.rs.NotFoundException;
@@ -14,6 +15,8 @@ import java.util.stream.Collectors;
 import Domain.Post;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.ForbiddenException;
+import notificationModule.NotificationEvent;
+import notificationModule.NotificationProducer;
 
 
 @Stateless
@@ -21,7 +24,8 @@ public class GroupService {
 
     @PersistenceContext
     private EntityManager em;
-
+    @Inject
+    private NotificationProducer notificationProducer;
     /**
      * Create a new group and persist it.
      */
@@ -36,29 +40,7 @@ public class GroupService {
      * Otherwise, leave for admin approval.
      */
 
-    public boolean joinGroup(Long groupId, User user) {
-        Group group = em.find(Group.class, groupId);
-        if (group == null) {
-            throw new IllegalArgumentException("Group not found");
-        }
 
-        if (!group.isClosed()) {
-            // open → join immediately
-            if (!group.getMembers().contains(user)) {
-                group.addMember(user);
-            }
-            em.merge(group);
-            return false;
-        } else {
-            // closed → queue a request
-            if (!group.getJoinRequests().contains(user)
-                    && !group.getMembers().contains(user)) {
-                group.addJoinRequest(user);
-                em.merge(group);
-            }
-            return true;
-        }
-    }
 
     /**
      * Admin approves or rejects membership. Approve then add to members.
@@ -86,14 +68,66 @@ public class GroupService {
     /**
      * Leave a group, removing the user from members list.
      */
+    public boolean joinGroup(Long groupId, User user) {
+        Group group = em.find(Group.class, groupId);
+        if (group == null) {
+            throw new IllegalArgumentException("Group not found");
+        }
+
+        if (!group.isClosed()) {
+            // open → join immediately
+            if (!group.getMembers().contains(user)) {
+                group.addMember(user);
+                em.merge(group);
+
+                // Send notification to group creator/admin
+                if (!user.getId().equals(group.getCreator().getId())) {
+                    NotificationEvent event = new NotificationEvent();
+                    event.setEventType("GROUP_JOIN");
+                    event.setFromUserId(user.getId());
+                    event.setToUserId(group.getCreator().getId());
+                    event.setMessage(user.getName() + " joined your group \"" + group.getName() + "\".");
+
+
+                    notificationProducer.sendNotification(event);
+                }
+            }
+            return false;
+        } else {
+            // closed → queue a request
+            if (!group.getJoinRequests().contains(user)
+                    && !group.getMembers().contains(user)) {
+                group.addJoinRequest(user);
+                em.merge(group);
+            }
+            return true;
+        }
+    }
+
     public void leaveGroup(Long groupId, User user) {
         Group group = em.find(Group.class, groupId);
         if (group == null) {
             throw new IllegalArgumentException("Group not found");
         }
-        group.removeMember(user);
-        em.merge(group);
+
+        if (group.getMembers().contains(user)) {
+            group.removeMember(user);
+            em.merge(group);
+
+            // Send notification to group creator/admin
+            if (!user.getId().equals(group.getCreator().getId())) {
+                NotificationEvent event = new NotificationEvent();
+                event.setEventType("GROUP_LEAVE");
+                event.setFromUserId(user.getId());
+                event.setToUserId(group.getCreator().getId());
+                event.setMessage(user.getName() + " left your group \"" + group.getName() + "\".");
+
+
+                notificationProducer.sendNotification(event);
+            }
+        }
     }
+
 
     /**
      * Retrieve all groups with their members eagerly fetched to avoid lazy initialization errors.

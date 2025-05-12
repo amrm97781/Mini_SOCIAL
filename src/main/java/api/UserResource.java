@@ -7,6 +7,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import util.JwtUtil;
 
 import java.util.List;
 
@@ -23,9 +24,16 @@ public class UserResource {
     public Response register(UserRegistrationDTO userDTO) {
         try {
             User user = userService.registerUser(userDTO);
-            return Response.status(Response.Status.CREATED).entity(user).build();
+
+            String token = JwtUtil.generateToken(user.getEmail());
+
+            return Response.status(Response.Status.CREATED)
+                    .entity("{\"message\":\"User registered successfully\", \"token\":\"" + token + "\"}")
+                    .build();
         } catch (Exception e) {
-            return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity("{\"error\":\"" + e.getMessage() + "\"}")
+                    .build();
         }
     }
     @GET
