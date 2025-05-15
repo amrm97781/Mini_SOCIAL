@@ -9,6 +9,8 @@ import app.DTO.CreateGroupDTO;
 import app.DTO.MembershipActionDTO;
 import app.DTO.GroupDetailsDTO;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.ws.rs.*;
@@ -110,6 +112,7 @@ public class GroupResource {
     public Response leaveGroup(@PathParam("id") Long id) {
         User me = getCurrentUser();
         groupService.leaveGroup(id, me);
+
         return Response.ok().build();
     }
 
@@ -243,7 +246,7 @@ public class GroupResource {
     @Path("/{id}")
     @RolesAllowed("GROUP_ADMIN")
     public Response deleteGroup(@PathParam("id") Long groupId){
-        groupService.deleteGroup(groupId);
+        groupService.deleteGroup(groupId,getCurrentUser());
         return Response.noContent().build();
     }
 

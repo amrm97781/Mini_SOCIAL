@@ -79,19 +79,17 @@ public class GroupService {
             if (!group.getMembers().contains(user)) {
                 group.addMember(user);
                 em.merge(group);
-
-                // Send notification to group creator/admin
-                if (!user.getId().equals(group.getCreator().getId())) {
-                    NotificationEvent event = new NotificationEvent();
-                    event.setEventType("GROUP_JOIN");
-                    event.setFromUserId(user.getId());
-                    event.setToUserId(group.getCreator().getId());
-                    event.setMessage(user.getName() + " joined your group \"" + group.getName() + "\".");
-
-
-                    notificationProducer.sendNotification(event);
-                }
             }
+            NotificationEvent event = new NotificationEvent();
+            event.setEventType("GROUP_JOIN");
+            event.setFromUserId(user.getId());
+            event.setToUserId(group.getCreator().getId());
+            event.setMessage(user.getName() + " joined your group \"" + group.getName() + "\".");
+
+
+            notificationProducer.sendNotification(event);
+
+
             return false;
         } else {
             // closed → queue a request
@@ -100,9 +98,18 @@ public class GroupService {
                 group.addJoinRequest(user);
                 em.merge(group);
             }
+            NotificationEvent event = new NotificationEvent();
+            event.setEventType("GROUP_JOIN");
+            event.setFromUserId(user.getId());
+            event.setToUserId(group.getCreator().getId());
+            event.setMessage(user.getName() + " joined your group \"" + group.getName() + "\".");
+
+
+            notificationProducer.sendNotification(event);
             return true;
         }
     }
+
 
     public void leaveGroup(Long groupId, User user) {
         Group group = em.find(Group.class, groupId);
@@ -110,12 +117,15 @@ public class GroupService {
             throw new IllegalArgumentException("Group not found");
         }
 
-        if (group.getMembers().contains(user)) {
-            group.removeMember(user);
-            em.merge(group);
+        User u = em.find(User.class, user.getId());
+        if (u == null || !isMember(group, u)) {
+            throw new BadRequestException("Not a member");
+        }
+        group.removeMember(u);
+        group.removeAdmin(u);
+        em.merge(group);
 
-            // Send notification to group creator/admin
-            if (!user.getId().equals(group.getCreator().getId())) {
+
                 NotificationEvent event = new NotificationEvent();
                 event.setEventType("GROUP_LEAVE");
                 event.setFromUserId(user.getId());
@@ -124,8 +134,8 @@ public class GroupService {
 
 
                 notificationProducer.sendNotification(event);
-            }
-        }
+
+
     }
 
 
@@ -187,14 +197,22 @@ public class GroupService {
         return group;
     }
 
-    public void deleteGroup(Long groupId) {
+    public void deleteGroup(Long groupId, User requester) {
         Group group = findById(groupId);
-        // ensure managed
+
+        // Check if the requester is an admin
+        if (!isAdmin(group, requester)) {
+            throw new ForbiddenException("Only admins can delete the group");
+        }
+
+        // Ensure the group is managed
         if (!em.contains(group)) {
             group = em.merge(group);
         }
+
         em.remove(group);
     }
+
 
 
 

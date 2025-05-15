@@ -84,4 +84,7 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "friend_id")
     )
     private List<User> friends = new ArrayList<>();
+
+
+
 }

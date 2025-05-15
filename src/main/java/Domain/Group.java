@@ -130,7 +130,8 @@ public class Group {
 
     public void addMember(User u) { members.add(u); }
 
-    public void removeMember(User u) { members.remove(u); }
+    public void removeMember(User u) { members.remove(u);
+       }
 
     public void addJoinRequest(User u) {
         joinRequests.add(u);
